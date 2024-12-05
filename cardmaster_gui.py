@@ -501,6 +501,6 @@ class CardmasterGUI(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = CardmasterGUI()
-    window.show()
+    window.showFullScreen()
     sys.exit(app.exec_())
 
