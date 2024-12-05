@@ -62,7 +62,7 @@ class CardmasterGUI(QMainWindow):
 
         start_game_button = QPushButton("Start Game")
         start_game_button.setStyleSheet(button_style)
-        start_game_button.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.select_seats_page))
+        start_game_button.clicked.connect(self.handle_start_game)  # Updated to handle start game
         layout.addWidget(start_game_button)
 
         select_game_button = QPushButton("Select Game")
@@ -139,6 +139,15 @@ class CardmasterGUI(QMainWindow):
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)
 
+        # Display warning for Blackjack
+        if self.selected_game == "Blackjack":
+            blackjack_warning = QLabel(
+                "Blackjack Note: Only 5 seats can be selected. Leave one seat unselected for the dealer."
+            )
+            blackjack_warning.setStyleSheet("font-size: 14px; color: red; margin-bottom: 10px;")
+            blackjack_warning.setWordWrap(True)
+            layout.addWidget(blackjack_warning)
+
         self.seat_checkboxes = []
         grid_layout = QGridLayout()
         for i in range(1, self.total_players + 1):
@@ -183,19 +192,45 @@ class CardmasterGUI(QMainWindow):
         instructions = QLabel(
             "Host Instructions:\n"
             "1. Select a game (UNO, Phase 10, or Blackjack).\n"
+            "   - If Blackjack is selected, only select up to 5 player seats. The remaining seat, or the 6th seat if less than 5 seats are selected, is used as the delear.\n"
             "2. Choose player seats.\n"
             "3. Start the game to deal the starting cards.\n"
-            "4. Use the 'Manage Game' screen to shuffle, reverse dealing order, or end the game.\n\n"
+            "4. Use the 'Manage Game' screen to shuffle, redeal, or end the game.\n\n"
             "Player Instructions:\n"
-            "1. Player will press their designated 'draw card' button to receive a card during their turn. \n"
+            "1. Player will press their designated 'draw card' button to receive a card during their turn.\n"
             "2. Player will press their designated 'end turn' button so that the Cardmaster can ready itself for the next player.\n\n"
-            "Shuffler Instructions:\n"
-            "1. Insert a new deck of cards into the loading tray. \n"
-            "2. Simply start the shuffle before starting the game, or during. \n\n"
             "Game Instructions:\n"
-            "Phase 10: \n"
-            "UNO: \n"
-            "Blackjack: \n"
+            "UNO:\n"
+            "   - Players take turns matching a card in their hand with the current card on the table by color or number.\n"
+            "   - Special action cards:\n"
+            "       * Skip: Skips the next player's turn.\n"
+            "       * Reverse: Reverses the turn order.\n"
+            "       * Draw Two: The next player draws two cards and forfeits their turn.\n"
+            "       * Wild: Allows the player to choose a new color.\n"
+            "       * Wild Draw Four: Allows the player to choose a new color, and the next player draws four cards (can only be played if no other playable cards are in hand).\n"
+            "   - The first player to empty their hand wins the round, and points are scored based on cards left in opponents' hands.\n\n"
+            "Phase 10:\n"
+            "   - Players must complete phases in order. The first player to complete all ten phases wins.\n"
+            "   - The phases:\n"
+            "       1. Two sets of three cards.\n"
+            "       2. One set of three cards and one run of four cards.\n"
+            "       3. One set of four cards and one run of four cards.\n"
+            "       4. One run of seven cards.\n"
+            "       5. One run of eight cards.\n"
+            "       6. One run of nine cards.\n"
+            "       7. Two sets of four cards.\n"
+            "       8. Seven cards of one color.\n"
+            "       9. One set of five cards and one set of two cards.\n"
+            "       10. One set of five cards and one set of three cards.\n"
+            "   - A player who does not complete the phase must retry the same phase in the next round.\n\n"
+            "Blackjack:\n"
+            "   - Players aim to achieve a hand value of 21 or as close as possible without exceeding it.\n"
+            "   - Card values:\n"
+            "       * Number cards: Face value.\n"
+            "       * Face cards (King, Queen, Jack): 10 points.\n"
+            "       * Aces: 1 or 11 points, depending on the player's preference.\n"
+            "   - Each player is dealt two cards to start. Players can 'Hit' to take another card or 'Stand' to end their turn.\n"
+            "   - The dealer must draw to 16 and stand on 17 or higher. Players win by having a higher hand value than the dealer without exceeding 21.\n"
         )
         instructions.setStyleSheet("font-size: 16px;")
         instructions.setWordWrap(True)
@@ -226,10 +261,10 @@ class CardmasterGUI(QMainWindow):
         
         button_style = "font-size: 16px; padding: 10px; margin: 5px;"
 
-        reverse_order_button = QPushButton("Reverse Dealing Order")
-        reverse_order_button.setStyleSheet(button_style)
-        reverse_order_button.clicked.connect(lambda: self.navigate_to_confirm_reverse_order(self.manage_game_page))
-        layout.addWidget(reverse_order_button)
+        redeal_cards_button = QPushButton("Redeal Starting Cards")
+        redeal_cards_button.setStyleSheet(button_style)
+        redeal_cards_button.clicked.connect(self.redeal_starting_cards)
+        layout.addWidget(redeal_cards_button)
 
         shuffle_new_deck_button = QPushButton("Shuffle New Deck")
         shuffle_new_deck_button.setStyleSheet(button_style)
@@ -318,22 +353,45 @@ class CardmasterGUI(QMainWindow):
             self.stacked_widget.setCurrentWidget(self.previous_page)
 
     # Other methods remain unchanged
+    def handle_start_game(self):
+        # Display initial message for Blackjack
+        if self.selected_game == "Blackjack":
+            QMessageBox.information(
+                self,
+                "Blackjack Seat Selection",
+                "For Blackjack, leave one seat unselected to act as the dealer."
+            )
 
+        # Navigate to seat selection screen
+        self.stacked_widget.setCurrentWidget(self.select_seats_page)
 
     def confirm_seats(self):
-        self.active_players = [i + 1 for i, checkbox in enumerate(self.seat_checkboxes) if checkbox.isChecked()]
+        selected_seats = [i + 1 for i, checkbox in enumerate(self.seat_checkboxes) if checkbox.isChecked()]
+        
+        if self.selected_game == "Blackjack":
+            if len(selected_seats) > 5:
+                QMessageBox.warning(self, "Too Many Seats", "Blackjack only allows up to 5 player seats. Leave one seat for the dealer.")
+                return
+            elif len(selected_seats) < 1:
+                QMessageBox.warning(self, "No Seats Selected", "Please select at least one seat for the game.")
+                return
+
+            # Add the dealer as the 6th player if fewer than 5 seats are selected
+            if len(selected_seats) < 5:
+                QMessageBox.information(self, "Dealer Assigned", "Seat 6 has been automatically assigned as the dealer.")
+                selected_seats.append(6)
+            self.active_players = selected_seats
+        else:
+            if len(selected_seats) < 1:
+                QMessageBox.warning(self, "No Seats Selected", "Please select at least one seat for the game.")
+                return
+            self.active_players = selected_seats
+
         self.player_cards = {player: 0 for player in self.active_players}  # Initialize card count per player
-        
-        if not self.active_players:
-            QMessageBox.warning(self, "No Seats Selected", "Please select at least one seat to continue.")
-            return
-        
-        if self.selected_game is None:
-            QMessageBox.warning(self, "No Game Selected", "Please select a game before starting.")
-            return
-        
+
         QMessageBox.information(self, "Seats Confirmed", f"Players in seats {self.active_players} will participate.")
         self.initial_deal()
+
 
     def initial_deal(self):
         self.current_player_index = 0
@@ -344,16 +402,63 @@ class CardmasterGUI(QMainWindow):
             QMessageBox.information(self, "Dealing Complete", "All players have received their starting cards.")
             self.stacked_widget.setCurrentWidget(self.manage_game_page)
             return
-        
+
+        # Determine the current player
         player = self.active_players[self.current_player_index]
         self.player_cards[player] += 1
-        QMessageBox.information(self, "Dealing", f"Dealt 1 card to Player {player}. Total cards: {self.player_cards[player]}")
-        
+
+        # Special message for Blackjack dealer
+        if self.selected_game == "Blackjack" and player == 6:
+            QMessageBox.information(self, "Dealing", f"Dealt 1 card to the Dealer (Seat 6). Total cards: {self.player_cards[player]}")
+        else:
+            QMessageBox.information(self, "Dealing", f"Dealt 1 card to Player {player}. Total cards: {self.player_cards[player]}")
+
         # Move to next player
         self.current_player_index = (self.current_player_index + 1) % len(self.active_players)
         self.deal_one_card()
 
-    # Placeholder methods for actions
+    
+    def redeal_starting_cards(self):
+        if not self.active_players:
+            QMessageBox.warning(self, "No Players", "No active players to redeal cards.")
+            return
+
+        # Determine starting player based on game type
+        if self.selected_game == "Blackjack":
+            starting_player = self.active_players[0]  # Always start with Player 1 for Blackjack
+        else:
+            self.current_player_index = (self.current_player_index + 1) % len(self.active_players)
+            starting_player = self.active_players[self.current_player_index]
+
+        # Reset player card counts and redeal starting cards
+        self.player_cards = {player: 0 for player in self.active_players}
+        QMessageBox.information(self, "Redeal", f"Redealing starting cards. Player {starting_player} will be dealt first.")
+        
+        self.deal_starting_cards(starting_player)
+
+
+    def deal_starting_cards(self, starting_player):
+        # Determine the starting player index
+        starting_index = self.active_players.index(starting_player)
+
+        # Deal cards in order, starting from the specified player
+        for _ in range(self.starting_cards):
+            for i in range(len(self.active_players)):
+                current_player = self.active_players[(starting_index + i) % len(self.active_players)]
+
+                # Special message for Blackjack dealer
+                if self.selected_game == "Blackjack" and current_player == "Dealer":
+                    QMessageBox.information(
+                        self, "Dealing", f"Dealt 1 card to the Dealer. Total cards: {self.player_cards[current_player] + 1}"
+                    )
+                else:
+                    QMessageBox.information(
+                        self, "Dealing", f"Dealt 1 card to Player {current_player}. Total cards: {self.player_cards[current_player] + 1}"
+                    )
+
+                self.player_cards[current_player] += 1
+
+
     def shuffle_cards(self):
         QMessageBox.information(self, "Shuffling", "The deck is being shuffled.")
         self.return_to_previous_page()
@@ -364,13 +469,28 @@ class CardmasterGUI(QMainWindow):
         self.return_to_previous_page()
 
     def end_game(self):
-        reply = QMessageBox.question(self, "End Game", "Are you sure you want to end the game?", QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.question(
+            self,
+            "End Game",
+            "Are you sure you want to end the game?",
+            QMessageBox.Yes | QMessageBox.No
+        )
         if reply == QMessageBox.Yes:
+            # Reset the starting player index to 0 for the next game
+            self.current_player_index = 0
+            QMessageBox.information(self, "Game Ended", "The game has ended. The next game will start with Player 1.")
+            
+            # Reset any other game-specific states if necessary
+            self.player_cards = {}  # Clear player card counts
+            self.active_players = []  # Clear active player list
+            self.selected_game = None  # Clear selected game
+            
+            # Return to the home page
             self.stacked_widget.setCurrentWidget(self.home_page)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = CardmasterGUI()
-    window.showFullScreen()
+    window.show()
     sys.exit(app.exec_())
 
