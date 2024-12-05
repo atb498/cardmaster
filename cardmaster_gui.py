@@ -375,11 +375,15 @@ class CardmasterGUI(QMainWindow):
             elif len(selected_seats) < 1:
                 QMessageBox.warning(self, "No Seats Selected", "Please select at least one seat for the game.")
                 return
-
-            # Add the dealer as the 6th player if fewer than 5 seats are selected
-            if len(selected_seats) < 5:
-                QMessageBox.information(self, "Dealer Assigned", "Seat 6 has been automatically assigned as the dealer.")
-                selected_seats.append(6)
+            
+            # Automatically assign the remaining seat as the dealer if 5 seats are selected
+            if len(selected_seats) == 5:
+                all_seats = set(range(1, self.total_players + 1))
+                dealer_seat = list(all_seats - set(selected_seats))[0]  # Find the unselected seat
+                QMessageBox.information(self, "Dealer Assigned", f"Seat {dealer_seat} has been automatically assigned as the dealer.")
+                selected_seats.append(dealer_seat)
+            
+            # Assign selected seats to active players
             self.active_players = selected_seats
         else:
             if len(selected_seats) < 1:
@@ -391,6 +395,7 @@ class CardmasterGUI(QMainWindow):
 
         QMessageBox.information(self, "Seats Confirmed", f"Players in seats {self.active_players} will participate.")
         self.initial_deal()
+
 
 
     def initial_deal(self):
@@ -408,14 +413,19 @@ class CardmasterGUI(QMainWindow):
         self.player_cards[player] += 1
 
         # Special message for Blackjack dealer
-        if self.selected_game == "Blackjack" and player == 6:
-            QMessageBox.information(self, "Dealing", f"Dealt 1 card to the Dealer (Seat 6). Total cards: {self.player_cards[player]}")
+        if self.selected_game == "Blackjack" and player in range(1, self.total_players + 1) and player == self.active_players[-1]:
+            QMessageBox.information(
+                self, "Dealing", f"Dealt 1 card to the Dealer (Seat {player}). Total cards: {self.player_cards[player]}"
+            )
         else:
-            QMessageBox.information(self, "Dealing", f"Dealt 1 card to Player {player}. Total cards: {self.player_cards[player]}")
+            QMessageBox.information(
+                self, "Dealing", f"Dealt 1 card to Player {player}. Total cards: {self.player_cards[player]}"
+            )
 
         # Move to next player
         self.current_player_index = (self.current_player_index + 1) % len(self.active_players)
         self.deal_one_card()
+
 
     
     def redeal_starting_cards(self):
